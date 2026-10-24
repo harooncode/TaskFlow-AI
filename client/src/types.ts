@@ -22,3 +22,19 @@ export interface TaskInput {
 }
 
 export interface Stats { todo: number; "in-progress": number; done: number; total: number }
+
+export interface SubtaskItem {
+  title: string;
+  priority: Priority;
+  status: Status;
+}
+
+export interface AIChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  suggestedSubtasks?: SubtaskItem[];
+  isDescriptionMissing?: boolean;
+  timestamp: string;
+}
+

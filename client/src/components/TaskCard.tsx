@@ -6,9 +6,10 @@ interface Props {
   onStatusChange: (id: string, status: Status) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onAskAI?: (task: Task) => void;
 }
 
-export default function TaskCard({ task, onStatusChange, onEdit, onDelete }: Props) {
+export default function TaskCard({ task, onStatusChange, onEdit, onDelete, onAskAI }: Props) {
   const overdue = task.dueDate && task.status !== "done" && new Date(task.dueDate) < new Date();
   return (
     <div className={`${card} flex flex-col gap-2 p-3.5 shadow-md transition hover:-translate-y-0.5 hover:border-mint/35`}>
@@ -25,9 +26,22 @@ export default function TaskCard({ task, onStatusChange, onEdit, onDelete }: Pro
         ) : (
           <span className="text-[11px] italic text-fog/50">No due date</span>
         )}
-        <button type="button" className={`${btnSmall} px-2.5 py-1 text-xs`} onClick={() => onEdit(task)}>
-          Edit
-        </button>
+        <div className="flex items-center gap-1.5">
+          {onAskAI && (
+            <button
+              type="button"
+              title="Get AI guidance for this task"
+              className="inline-flex items-center gap-1 rounded-lg border border-mint/30 bg-mint/10 px-2 py-1 text-xs font-bold text-mint transition hover:bg-mint/20 hover:border-mint/50"
+              onClick={() => onAskAI(task)}
+            >
+              <span>✨</span>
+              <span>Guide</span>
+            </button>
+          )}
+          <button type="button" className={`${btnSmall} px-2.5 py-1 text-xs`} onClick={() => onEdit(task)}>
+            Edit
+          </button>
+        </div>
       </div>
       <div className="flex items-center gap-2 pt-1">
         <select

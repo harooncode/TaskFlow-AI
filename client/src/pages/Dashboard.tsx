@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import TaskCard from "../components/TaskCard";
 import TaskForm from "../components/TaskForm";
 import LogoMark from "../components/LogoMark";
+import AICopilotDrawer from "../components/AICopilotDrawer";
 import { btnSmall, card, errorBox, field } from "../ui";
 import type { Stats, Status, Task, TaskInput } from "../types";
 
@@ -21,6 +22,8 @@ export default function Dashboard() {
   const [editing, setEditing] = useState<Task | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [aiFocusedTask, setAiFocusedTask] = useState<Task | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +70,19 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex min-w-max items-center gap-2.5">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl border border-mint/40 bg-gradient-to-r from-mint/15 via-[#18c48c]/20 to-mint/15 px-3 py-2 text-xs font-bold text-mint shadow-[0_0_15px_rgba(46,230,166,0.18)] transition hover:-translate-y-px hover:border-mint/60 hover:shadow-[0_0_22px_rgba(46,230,166,0.38)]"
+            onClick={() => {
+              setAiFocusedTask(null);
+              setIsCopilotOpen(true);
+            }}
+          >
+            <span className="grid h-5 w-5 place-items-center rounded-md bg-mint text-[11px] text-ink font-black shadow-mint">
+              ✨
+            </span>
+            <span>AI Copilot</span>
+          </button>
           <span className="grid h-9 w-9 place-items-center rounded-full border border-mint/35 bg-mint/15 text-sm font-extrabold text-mint">
             {initial}
           </span>
@@ -133,8 +149,17 @@ export default function Dashboard() {
                       </p>
                     )}
                     {items.map((t) => (
-                      <TaskCard key={t._id} task={t} onStatusChange={changeStatus}
-                        onEdit={setEditing} onDelete={remove} />
+                      <TaskCard
+                        key={t._id}
+                        task={t}
+                        onStatusChange={changeStatus}
+                        onEdit={setEditing}
+                        onDelete={remove}
+                        onAskAI={(task) => {
+                          setAiFocusedTask(task);
+                          setIsCopilotOpen(true);
+                        }}
+                      />
                     ))}
                   </section>
                 );
@@ -143,6 +168,14 @@ export default function Dashboard() {
           )}
         </main>
       </div>
+
+      <AICopilotDrawer
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        focusedTask={aiFocusedTask}
+        onClearFocusedTask={() => setAiFocusedTask(null)}
+        onSubtasksCreated={load}
+      />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { Stats, Task, TaskInput, User } from "./types";
+import type { Stats, SubtaskItem, Task, TaskInput, User } from "./types";
 
 const TOKEN_KEY = "taskflow_token";
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
@@ -38,4 +38,26 @@ export const api = {
   updateTask: (id: string, body: Partial<TaskInput>) =>
     request<{ task: Task }>(`/tasks/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteTask: (id: string) => request<void>(`/tasks/${id}`, { method: "DELETE" }),
+  aiChat: (body: {
+    message: string;
+    focusedTaskId?: string;
+    history?: Array<{ role: "user" | "assistant"; content: string }>;
+  }) =>
+    request<{
+      reply: string;
+      suggestedSubtasks?: SubtaskItem[];
+      focusedTask?: { id: string; title: string };
+    }>("/ai/chat", { method: "POST", body: JSON.stringify(body) }),
+  aiGuideTask: (taskId: string) =>
+    request<{
+      reply: string;
+      isDescriptionMissing: boolean;
+      task: { id: string; title: string; description?: string };
+      suggestedSubtasks?: SubtaskItem[];
+    }>("/ai/guide-task", { method: "POST", body: JSON.stringify({ taskId }) }),
+  aiBreakdown: (body: { title: string; description?: string }) =>
+    request<{ subtasks: SubtaskItem[] }>("/ai/breakdown", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

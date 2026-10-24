@@ -1,11 +1,10 @@
 import "dotenv/config";
-import path from "path";
-import fs from "fs";
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./config/db";
 import authRoutes from "./routes/auth";
 import taskRoutes from "./routes/tasks";
+import aiRoutes from "./routes/ai";
 import { errorHandler, notFound } from "./middleware/error";
 
 const { PORT = "5000", MONGO_URI, JWT_SECRET, CLIENT_ORIGIN = "http://localhost:5173" } = process.env;
@@ -18,18 +17,14 @@ const app = express();
 app.use(cors({ origin: CLIENT_ORIGIN }));
 app.use(express.json());
 
+app.get("/", (_req, res) => res.json({ name: "TaskFlow API", status: "running", version: "1.0.0" }));
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/ai", aiRoutes);
 
-// Serve the built React app in production
-const clientDist = path.resolve(__dirname, "../../client/dist");
-if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get(/^\/(?!api).*/, (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
-}
-
-app.use("/api", notFound);
+// 404 handler for any unmatched route
+app.use(notFound);
 app.use(errorHandler);
 
 connectDB(MONGO_URI)
