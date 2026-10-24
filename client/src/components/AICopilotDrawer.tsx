@@ -33,9 +33,24 @@ export default function AICopilotDrawer({
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [addingSubtasks, setAddingSubtasks] = useState(false);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+
+  // Load available SpeechSynthesis voices for accent detection
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const loadVoices = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v && v.length > 0) setVoices(v);
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    return () => {
+      if (window.speechSynthesis) window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -97,19 +112,64 @@ export default function AICopilotDrawer({
     fetchTaskGuidance();
   }, [focusedTask, isOpen]);
 
-  // Text to Speech (100% Free Browser Native)
+  // Text to Speech (100% Free Browser Native with Natural Accent Detection)
   const speakText = (text: string) => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
+    if (!voiceEnabled || typeof window === "undefined" || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
 
-    // Clean markdown symbols for cleaner pronunciation
+    // Check if the response contains Roman Urdu / Hindustani vocabulary
+    const isRomanUrdu = /\b(aap|aapka|aapke|karein|karna|hai|hain|aaj|tasks|pehle|khatam|aur|yeh|hona|chahiye|mein|kaam|kyunki|lekin|shuru|zaroori|kuch|isliye|meri|mera|hum|batao|karo|nahi|matlab|bhi)\b/i.test(text);
+
+    // Clean markdown, symbols, emojis, and hashtags so narrator doesn't stumble or read symbols
     const cleanText = text
-      .replace(/[*_#`~]/g, "")
       .replace(/```[\s\S]*?```/g, "")
-      .replace(/\[.*?\]/g, "");
+      .replace(/[#*_~`]/g, "")
+      .replace(/\[.*?\]/g, "")
+      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, "")
+      .trim();
+
+    if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.05;
+
+    if (isRomanUrdu) {
+      // Prioritize natural Urdu/Hindi/South Asian voices
+      const urduVoice = voices.find((v) => v.lang.toLowerCase().startsWith("ur"));
+      const hindiVoice = voices.find((v) => v.lang.toLowerCase().startsWith("hi"));
+      const southAsianVoice = voices.find(
+        (v) =>
+          v.lang === "en-IN" ||
+          v.lang === "en-PK" ||
+          v.name.toLowerCase().includes("india") ||
+          v.name.toLowerCase().includes("pakistan") ||
+          v.name.toLowerCase().includes("urdu") ||
+          v.name.toLowerCase().includes("hindi") ||
+          v.name.toLowerCase().includes("heera") ||
+          v.name.toLowerCase().includes("neerja") ||
+          v.name.toLowerCase().includes("kalpana") ||
+          v.name.toLowerCase().includes("hemant") ||
+          v.name.toLowerCase().includes("asif")
+      );
+
+      const chosenVoice = urduVoice || hindiVoice || southAsianVoice;
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+        utterance.lang = chosenVoice.lang;
+      } else {
+        utterance.lang = "hi-IN";
+      }
+      utterance.rate = 1.0;
+    } else {
+      const englishVoice = voices.find(
+        (v) => v.lang.startsWith("en-US") || v.lang.startsWith("en-GB") || v.lang.startsWith("en")
+      );
+      if (englishVoice) {
+        utterance.voice = englishVoice;
+        utterance.lang = englishVoice.lang;
+      }
+      utterance.rate = 1.05;
+    }
+
     utterance.pitch = 1.0;
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
@@ -244,7 +304,7 @@ export default function AICopilotDrawer({
               </h2>
               <span className="flex items-center gap-1.5 text-[0.72rem] font-semibold text-fog">
                 <span className="h-1.5 w-1.5 rounded-full bg-mint animate-pulse" />
-                Groq 70B · Context-Aware
+                Groq AI · Context-Aware
               </span>
             </div>
           </div>
@@ -370,7 +430,7 @@ export default function AICopilotDrawer({
                   </div>
                 )}
 
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                <FormattedMessage content={m.content} />
 
                 {/* Suggested Subtasks Block */}
                 {m.suggestedSubtasks && m.suggestedSubtasks.length > 0 && (
@@ -481,6 +541,120 @@ export default function AICopilotDrawer({
           </div>
         </form>
       </div>
+    </div>
+  );
+}
+
+function renderInline(text: string) {
+  const parts: (string | JSX.Element)[] = [];
+  const regex = /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("**") && token.endsWith("**")) {
+      parts.push(
+        <strong key={match.index} className="font-bold text-cream">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      parts.push(
+        <em key={match.index} className="italic text-[#b5cbda]">
+          {token.slice(1, -1)}
+        </em>
+      );
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      parts.push(
+        <code
+          key={match.index}
+          className="rounded bg-black/40 px-1.5 py-0.5 font-mono text-[0.82em] text-mint border border-mint/20"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+function FormattedMessage({ content }: { content: string }) {
+  const cleaned = content.replace(/\r\n/g, "\n");
+  const blocks = cleaned.split(/\n\s*\n/);
+
+  return (
+    <div className="flex flex-col gap-3 leading-relaxed">
+      {blocks.map((block, idx) => {
+        const trimmed = block.trim();
+        if (!trimmed) return null;
+
+        // Check if block starts with header hashtags: #, ##, ###
+        if (/^#{1,4}\s+/.test(trimmed)) {
+          const headerText = trimmed.replace(/^#{1,4}\s+/, "");
+          return (
+            <h4
+              key={idx}
+              className="font-display text-sm font-bold tracking-tight text-mint pt-1"
+            >
+              {renderInline(headerText)}
+            </h4>
+          );
+        }
+
+        // Check if block is a list (numbered 1. or bullet - )
+        const lines = trimmed.split("\n");
+        const isList = lines.every((line) => /^(\d+\.|\-|\*)\s+/.test(line.trim()));
+
+        if (isList) {
+          return (
+            <ul key={idx} className="flex flex-col gap-2 pl-0.5 my-1">
+              {lines.map((line, lIdx) => {
+                const itemMatch = line.trim().match(/^(\d+\.|\-|\*)\s+(.*)/);
+                const bullet = itemMatch ? itemMatch[1] : "•";
+                const itemContent = itemMatch ? itemMatch[2] : line;
+                const isNum = /^\d+\./.test(bullet);
+
+                return (
+                  <li key={lIdx} className="flex items-start gap-2 text-xs md:text-sm">
+                    <span
+                      className={`shrink-0 font-bold ${
+                        isNum
+                          ? "rounded-md bg-mint/15 px-1.5 py-0.5 text-[0.7rem] text-mint"
+                          : "mt-1.5 h-1.5 w-1.5 rounded-full bg-mint"
+                      }`}
+                    >
+                      {isNum ? bullet : null}
+                    </span>
+                    <span className="flex-1 leading-snug">{renderInline(itemContent)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          );
+        }
+
+        // Standard paragraph
+        return (
+          <p key={idx} className="text-xs md:text-sm leading-relaxed text-[#dbe8ef]">
+            {lines.map((l, lIdx) => (
+              <span key={lIdx}>
+                {renderInline(l)}
+                {lIdx < lines.length - 1 && <br />}
+              </span>
+            ))}
+          </p>
+        );
+      })}
     </div>
   );
 }

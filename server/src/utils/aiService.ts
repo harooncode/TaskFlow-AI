@@ -20,30 +20,42 @@ export interface AIChatResponse {
 }
 
 const GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const PRIMARY_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+const FALLBACK_MODEL = "openai/gpt-oss-20b";
 
 export async function callGroqChat(
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
-  temperature = 0.5
+  temperature = 0.5,
+  maxTokens = 450
 ): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("GROQ_API_KEY is not configured in server/.env");
   }
 
-  const response = await fetch(GROQ_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages,
-      temperature,
-      max_tokens: 1024,
-    }),
-  });
+  const callModel = async (model: string) => {
+    return fetch(GROQ_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+      }),
+    });
+  };
+
+  let response = await callModel(PRIMARY_MODEL);
+
+  // If primary model hits rate limit or error, automatically retry with fallback model
+  if (!response.ok && response.status === 429) {
+    console.warn(`Groq primary model ${PRIMARY_MODEL} rate limited (429). Retrying with ${FALLBACK_MODEL}...`);
+    response = await callModel(FALLBACK_MODEL);
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -89,7 +101,11 @@ STRICT GUARDRAILS & RULES:
 2. REFUSAL POLICY: If the user asks general trivia, cooking recipes, philosophy, general coding unrelated to their tasks, or open-ended world questions, POLITELY REFUSE and remind them that you are their TaskFlow Copilot dedicated solely to their active tasks and daily productivity.
 3. GROUNDING: Base your advice strictly on the user's actual tasks provided below. Reference task titles, statuses, and deadlines directly.
 4. LANGUAGE: If the user speaks/writes in Urdu or Roman Urdu, reply in natural, friendly Roman Urdu or Urdu. If they write in English, reply in English.
-5. FORMATTING: Use concise bullet points, bold key terms, and keep responses actionable and brief. Do not write long essays.
+5. CLEAN FORMATTING & SPACING:
+   - Separate every section and paragraph with a blank line for clean breathing room.
+   - DO NOT use raw markdown header hashtags (such as '###' or '##'). Use simple bold titles or emojis instead.
+   - Keep asterisks minimal — do NOT wrap every second word in '**'. Only bold crucial task names.
+   - Use clean, spaced numbered lists (1., 2., 3.) or bullets.
 6. JSON SUBTASKS (OPTIONAL): When explicitly asked to break down a task or create subtasks, you may include a JSON block at the end of your response with this exact tag:
 \`\`\`subtasks
 [

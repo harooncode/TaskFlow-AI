@@ -12,5 +12,6 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
   if (err instanceof HttpError) return res.status(err.status).json({ message: err.message });
   console.error(err);
-  res.status(500).json({ message: "Internal server error" });
+  const message = (err as Error)?.message || "Internal server error";
+  res.status(500).json({ message });
 }
