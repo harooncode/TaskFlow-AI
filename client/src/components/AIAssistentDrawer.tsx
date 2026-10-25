@@ -54,7 +54,7 @@ interface Props {
   onSubtasksCreated?: () => void;
 }
 
-export default function AICopilotDrawer({
+export default function AIAssistentDrawer({
   isOpen,
   onClose,
   focusedTask,

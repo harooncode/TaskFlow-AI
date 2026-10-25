@@ -52,7 +52,9 @@ export default function TaskForm({ initial, onSubmit, onCancel }: Props) {
           <option value="high">High</option>
         </select>
       </div>
-      <input className={field} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+
+      <input className={`${field} [color-scheme:white]`} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+      
       <div className="flex flex-wrap gap-2">
         <button className={btnPrimary}>{initial ? "Save" : "Add task"}</button>
         {onCancel && <button type="button" className={btn} onClick={onCancel}>Cancel</button>}
