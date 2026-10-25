@@ -5,6 +5,7 @@ import TaskCard from "../components/TaskCard";
 import TaskForm from "../components/TaskForm";
 import LogoMark from "../components/LogoMark";
 import AICopilotDrawer from "../components/AICopilotDrawer";
+import AnalyticsDrawer from "../components/AnalyticsDrawer";
 import { btnSmall, card, errorBox, field } from "../ui";
 import type { Stats, Status, Task, TaskInput } from "../types";
 
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [aiFocusedTask, setAiFocusedTask] = useState<Task | null>(null);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -70,11 +72,43 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex min-w-max items-center gap-2.5">
+          {/* Bell — overdue notifications */}
+          <button
+            type="button"
+            title="Notifications"
+            className="relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-fog transition hover:border-warn/40 hover:text-warn"
+            onClick={() => { setIsAnalyticsOpen(false); setIsCopilotOpen(false); }}
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {/* Red badge when overdue tasks exist */}
+            {(stats?.overdue ?? 0) > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white shadow-[0_0_8px_rgba(239,68,68,0.8)]">
+                {(stats?.overdue ?? 0) > 9 ? "9+" : stats?.overdue}
+              </span>
+            )}
+          </button>
+
+          {/* Analytics button */}
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl border border-sky/40 bg-gradient-to-r from-sky/15 via-[#1a9fd4]/20 to-sky/15 px-3 py-2 text-xs font-bold text-sky shadow-[0_0_15px_rgba(76,195,255,0.18)] transition hover:-translate-y-px hover:border-sky/60 hover:shadow-[0_0_22px_rgba(76,195,255,0.38)]"
+            onClick={() => { setIsCopilotOpen(false); setIsAnalyticsOpen((v) => !v); }}
+          >
+            <span className="grid h-5 w-5 place-items-center rounded-md bg-sky text-[11px] text-ink font-black shadow-[0_0_8px_rgba(76,195,255,0.5)]">
+              📊
+            </span>
+            <span>Analytics</span>
+          </button>
+
+          {/* AI Assistant button */}
           <button
             type="button"
             className="inline-flex items-center gap-2 rounded-xl border border-mint/40 bg-gradient-to-r from-mint/15 via-[#18c48c]/20 to-mint/15 px-3 py-2 text-xs font-bold text-mint shadow-[0_0_15px_rgba(46,230,166,0.18)] transition hover:-translate-y-px hover:border-mint/60 hover:shadow-[0_0_22px_rgba(46,230,166,0.38)]"
             onClick={() => {
               setAiFocusedTask(null);
+              setIsAnalyticsOpen(false);
               setIsCopilotOpen(true);
             }}
           >
@@ -83,6 +117,7 @@ export default function Dashboard() {
             </span>
             <span>AI</span>
           </button>
+
           <span className="grid h-9 w-9 place-items-center rounded-full border border-mint/35 bg-mint/15 text-sm font-extrabold text-mint">
             {initial}
           </span>
@@ -95,27 +130,15 @@ export default function Dashboard() {
       </header>
 
       {stats && (
-        <div className="mb-5 space-y-3">
-          {/* Row 1 — Status counts */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat value={stats.total} label="Total Tasks" valueClass="text-cream" blob="bg-sky" />
-            <Stat value={stats.todo} label="To Do" valueClass="text-warn" blob="bg-warn" />
-            <Stat value={stats["in-progress"]} label="In Progress" valueClass="text-sky" blob="bg-sky" />
-            <Stat value={stats.done} label="Completed" valueClass="text-mint" blob="bg-mint" />
-          </div>
-
-          {/* Row 2 — Overdue alert + Priority breakdown */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Stat
-              value={stats.overdue}
-              label="Overdue"
-              valueClass={stats.overdue > 0 ? "text-rose-400" : "text-fog"}
-              blob={stats.overdue > 0 ? "bg-rose-500" : "bg-white"}
-            />
-            <Stat value={stats.priority.high} label="High Priority" valueClass="text-rose-300" blob="bg-rose-500" />
-            <Stat value={stats.priority.medium} label="Medium Priority" valueClass="text-warn" blob="bg-warn" />
-            <Stat value={stats.priority.low} label="Low Priority" valueClass="text-fog" blob="bg-sky" />
-          </div>
+        <div className="mb-5 grid grid-cols-4 gap-2 md:grid-cols-8">
+          <Stat value={stats.total}             label="Total"    valueClass="text-cream"    blob="bg-sky" />
+          <Stat value={stats.todo}              label="To Do"    valueClass="text-warn"     blob="bg-warn" />
+          <Stat value={stats["in-progress"]}    label="Ongoing"  valueClass="text-sky"      blob="bg-sky" />
+          <Stat value={stats.done}              label="Done"     valueClass="text-mint"     blob="bg-mint" />
+          <Stat value={stats.overdue ?? 0}      label="Overdue"  valueClass={(stats.overdue ?? 0) > 0 ? "text-rose-400" : "text-fog"} blob={(stats.overdue ?? 0) > 0 ? "bg-rose-500" : "bg-white"} />
+          <Stat value={stats.priority?.high   ?? 0} label="High"   valueClass="text-rose-300" blob="bg-rose-500" />
+          <Stat value={stats.priority?.medium ?? 0} label="Medium" valueClass="text-warn"     blob="bg-warn" />
+          <Stat value={stats.priority?.low    ?? 0} label="Low"    valueClass="text-fog"      blob="bg-sky" />
         </div>
       )}
 
@@ -191,6 +214,12 @@ export default function Dashboard() {
         focusedTask={aiFocusedTask}
         onClearFocusedTask={() => setAiFocusedTask(null)}
         onSubtasksCreated={load}
+      />
+
+      <AnalyticsDrawer
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+        stats={stats}
       />
     </div>
   );

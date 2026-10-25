@@ -71,13 +71,13 @@ router.get(
       stats.total += r.count;
     }
 
-    // Overdue count
+    // Overdue count — always a number, never undefined
     const overdue: number = result.overdue[0]?.count ?? 0;
 
-    // Priority breakdown (non-done tasks only)
-    const priority: Record<string, number> = { high: 0, medium: 0, low: 0 };
+    // Priority breakdown — always an object with all three keys
+    const priority = { high: 0, medium: 0, low: 0 };
     for (const r of result.byPriority) {
-      priority[r._id] = r.count;
+      if (r._id in priority) priority[r._id as keyof typeof priority] = r.count;
     }
 
     res.json({ stats: { ...stats, overdue, priority } });

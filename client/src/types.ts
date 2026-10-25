@@ -26,8 +26,8 @@ export interface Stats {
   "in-progress": number;
   done: number;
   total: number;
-  overdue: number;
-  priority: { high: number; medium: number; low: number };
+  overdue?: number;
+  priority?: { high: number; medium: number; low: number };
 }
 
 export interface SubtaskItem {
