@@ -21,7 +21,14 @@ export interface TaskInput {
   dueDate?: string | null;
 }
 
-export interface Stats { todo: number; "in-progress": number; done: number; total: number }
+export interface Stats {
+  todo: number;
+  "in-progress": number;
+  done: number;
+  total: number;
+  overdue: number;
+  priority: { high: number; medium: number; low: number };
+}
 
 export interface SubtaskItem {
   title: string;

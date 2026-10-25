@@ -11,16 +11,43 @@ router.use(requireAuth);
 const chatSchema = z.object({
   message: z.string().trim().min(1, "Message is required").max(1000),
   focusedTaskId: z.string().optional(),
+  replyLang: z.enum(["ur-PK", "en-US"]).optional(),
   history: z
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().max(2000),
+        content: z.string().max(3000),
       })
     )
     .max(10)
     .optional(),
 });
+
+interface BoardAction {
+  type: "MOVE_TASK" | "DELETE_TASK" | "CREATE_TASK";
+  taskId?: string;
+  status?: "todo" | "in-progress" | "done";
+  // CREATE_TASK fields
+  title?: string;
+  description?: string;
+  priority?: "low" | "medium" | "high";
+  dueDate?: string | null;
+}
+
+function parseBoardAction(text: string) {
+  const match = text.match(/```action([\s\S]*?)```/);
+  if (!match) return { cleanedReply: text, action: undefined };
+
+  const jsonStr = match[1].trim();
+  const cleanedReply = text.replace(/```action[\s\S]*?```/, "").trim();
+  try {
+    const action = JSON.parse(jsonStr) as BoardAction;
+    return { cleanedReply, action };
+  } catch (err) {
+    console.error("Failed to parse board action JSON:", err);
+  }
+  return { cleanedReply, action: undefined };
+}
 
 function parseSubtasks(text: string) {
   const match = text.match(/```subtasks([\s\S]*?)```/);
@@ -39,11 +66,16 @@ function parseSubtasks(text: string) {
   return { cleanedReply, subtasks: undefined };
 }
 
+// Strip the hidden task_draft tracking block — never shown to the user
+function stripTaskDraft(text: string): string {
+  return text.replace(/```task_draft[\s\S]*?```/g, "").trim();
+}
+
 // 1. General Context-Aware Chat
 router.post(
   "/chat",
   asyncHandler(async (req, res) => {
-    const { message, focusedTaskId, history = [] } = chatSchema.parse(req.body);
+    const { message, focusedTaskId, replyLang, history = [] } = chatSchema.parse(req.body);
 
     const rawTasks = await Task.find({ user: req.userId }).sort({ createdAt: -1 }).limit(50);
     const now = new Date();
@@ -59,7 +91,7 @@ router.post(
     }));
 
     const focusedTask = focusedTaskId ? tasks.find((t) => t._id === focusedTaskId) : undefined;
-    const systemPrompt = buildSystemPrompt(tasks, focusedTask);
+    const systemPrompt = buildSystemPrompt(tasks, focusedTask, replyLang);
 
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemPrompt },
@@ -68,12 +100,36 @@ router.post(
     ];
 
     const rawReply = await callGroqChat(messages);
-    const { cleanedReply, subtasks } = parseSubtasks(rawReply);
+    const draftStripped = stripTaskDraft(rawReply);
+    const { cleanedReply: replyWithoutSubtasks, subtasks } = parseSubtasks(draftStripped);
+    const { cleanedReply, action } = parseBoardAction(replyWithoutSubtasks);
+
+    let boardUpdated = false;
+    if (action) {
+      if (action.type === "MOVE_TASK" && action.taskId && action.status) {
+        await Task.findOneAndUpdate({ _id: action.taskId, user: req.userId }, { status: action.status });
+        boardUpdated = true;
+      } else if (action.type === "DELETE_TASK" && action.taskId) {
+        await Task.findOneAndDelete({ _id: action.taskId, user: req.userId });
+        boardUpdated = true;
+      } else if (action.type === "CREATE_TASK" && action.title) {
+        await Task.create({
+          user: req.userId,
+          title: action.title.trim(),
+          description: action.description?.trim() || "",
+          priority: action.priority || "medium",
+          status: "todo",
+          dueDate: action.dueDate ? new Date(action.dueDate) : null,
+        });
+        boardUpdated = true;
+      }
+    }
 
     res.json({
       reply: cleanedReply,
       suggestedSubtasks: subtasks,
       focusedTask: focusedTask ? { id: focusedTask._id, title: focusedTask.title } : null,
+      boardUpdated,
     });
   })
 );

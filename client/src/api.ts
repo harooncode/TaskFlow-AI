@@ -41,12 +41,14 @@ export const api = {
   aiChat: (body: {
     message: string;
     focusedTaskId?: string;
+    replyLang?: "ur-PK" | "en-US";
     history?: Array<{ role: "user" | "assistant"; content: string }>;
   }) =>
     request<{
       reply: string;
       suggestedSubtasks?: SubtaskItem[];
       focusedTask?: { id: string; title: string };
+      boardUpdated?: boolean;
     }>("/ai/chat", { method: "POST", body: JSON.stringify(body) }),
   aiGuideTask: (taskId: string) =>
     request<{

@@ -34,16 +34,53 @@ router.get(
 router.get(
   "/stats",
   asyncHandler(async (req, res) => {
-    const rows = await Task.aggregate([
-      { $match: { user: new mongoose.Types.ObjectId(req.userId) } },
-      { $group: { _id: "$status", count: { $sum: 1 } } },
+    const userId = new mongoose.Types.ObjectId(req.userId);
+    const now = new Date();
+
+    // Single aggregation with $facet — one DB round-trip, fully user-scoped.
+    // $match is the very first stage so MongoDB can use the { user, status } index
+    // and never touches any other user's documents.
+    const [result] = await Task.aggregate([
+      { $match: { user: userId } },                         // privacy: only this user's tasks
+      {
+        $facet: {
+          byStatus: [
+            { $group: { _id: "$status", count: { $sum: 1 } } },
+          ],
+          overdue: [
+            {
+              $match: {
+                status: { $ne: "done" },
+                dueDate: { $lt: now, $ne: null },
+              },
+            },
+            { $count: "count" },
+          ],
+          byPriority: [
+            { $match: { status: { $ne: "done" } } },       // only pending/in-progress tasks
+            { $group: { _id: "$priority", count: { $sum: 1 } } },
+          ],
+        },
+      },
     ]);
-    const stats = { todo: 0, "in-progress": 0, done: 0, total: 0 };
-    for (const r of rows) {
-      stats[r._id as keyof typeof stats] = r.count;
+
+    // Build status counts
+    const stats: Record<string, number> = { todo: 0, "in-progress": 0, done: 0, total: 0 };
+    for (const r of result.byStatus) {
+      stats[r._id] = r.count;
       stats.total += r.count;
     }
-    res.json({ stats });
+
+    // Overdue count
+    const overdue: number = result.overdue[0]?.count ?? 0;
+
+    // Priority breakdown (non-done tasks only)
+    const priority: Record<string, number> = { high: 0, medium: 0, low: 0 };
+    for (const r of result.byPriority) {
+      priority[r._id] = r.count;
+    }
+
+    res.json({ stats: { ...stats, overdue, priority } });
   })
 );
 

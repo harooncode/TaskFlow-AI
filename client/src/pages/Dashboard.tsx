@@ -81,7 +81,7 @@ export default function Dashboard() {
             <span className="grid h-5 w-5 place-items-center rounded-md bg-mint text-[11px] text-ink font-black shadow-mint">
               ✨
             </span>
-            <span>AI Copilot</span>
+            <span>AI</span>
           </button>
           <span className="grid h-9 w-9 place-items-center rounded-full border border-mint/35 bg-mint/15 text-sm font-extrabold text-mint">
             {initial}
@@ -95,11 +95,27 @@ export default function Dashboard() {
       </header>
 
       {stats && (
-        <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat value={stats.total} label="Total" valueClass="text-cream" blob="bg-sky" />
-          <Stat value={stats.todo} label="To do" valueClass="text-warn" blob="bg-warn" />
-          <Stat value={stats["in-progress"]} label="In progress" valueClass="text-sky" blob="bg-sky" />
-          <Stat value={stats.done} label="Done" valueClass="text-mint" blob="bg-mint" />
+        <div className="mb-5 space-y-3">
+          {/* Row 1 — Status counts */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat value={stats.total} label="Total Tasks" valueClass="text-cream" blob="bg-sky" />
+            <Stat value={stats.todo} label="To Do" valueClass="text-warn" blob="bg-warn" />
+            <Stat value={stats["in-progress"]} label="In Progress" valueClass="text-sky" blob="bg-sky" />
+            <Stat value={stats.done} label="Completed" valueClass="text-mint" blob="bg-mint" />
+          </div>
+
+          {/* Row 2 — Overdue alert + Priority breakdown */}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Stat
+              value={stats.overdue}
+              label="Overdue"
+              valueClass={stats.overdue > 0 ? "text-rose-400" : "text-fog"}
+              blob={stats.overdue > 0 ? "bg-rose-500" : "bg-white"}
+            />
+            <Stat value={stats.priority.high} label="High Priority" valueClass="text-rose-300" blob="bg-rose-500" />
+            <Stat value={stats.priority.medium} label="Medium Priority" valueClass="text-warn" blob="bg-warn" />
+            <Stat value={stats.priority.low} label="Low Priority" valueClass="text-fog" blob="bg-sky" />
+          </div>
         </div>
       )}
 
